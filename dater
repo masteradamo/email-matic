@@ -1,0 +1,68 @@
+f = "/path/to/email/"
+
+import os
+import email
+
+def sifter(direct,fates,tates):
+    for fold in os.listdir(direct):
+        fold = direct+"/"+fold
+        if os.path.isfile(fold):
+            fates,tates = opener(fold,fates,tates)
+        elif os.path.isdir(fold):
+            print "FOLDER",fold
+            fates,tates = sifter(fold,fates,tates)
+    return fates,tates
+
+def opener(fold,fates,tates):
+    msg = email.message_from_file(open(fold,'r'))
+#    print msg["date"]
+    date = email.utils.parsedate(msg["date"])
+#    print "DATE",date
+    if date[0] > 1998 and date[0] < 2003:
+        if date not in tates:
+            tates[date] = True
+            fates.append(date)
+    return fates,tates
+
+def setter(dates):
+    days = {}
+    wates = []
+    for item in dates:
+        day = "-".join([str(x) for x in item[:3]])
+        if day not in days:
+            days[day] = []
+            wates.append(day)
+        stamp = (60*item[3])+item[4]
+        days[day].append(stamp)
+    return days,wates
+
+def weighter(days,wates,sig,step):
+    ways = []
+    for n in range(len(wates)):
+        print "DATE",wates[n]
+        tries = days[wates[n]]
+        way = []
+        if n > 0:
+            prev = days[wates[n-1]]
+            tries.extend([x-1440 for x in prev if x>720])
+        if n < len(wates)-1:
+            post = days[wates[n+1]]
+            tries.extend([1440+x for x in post if x<720])
+        day = [(n,y,sig*sum([(1-sig)**(abs(y-x)) for x in tries if abs(y-x) < 720])) for y in range(1440)[0::step]]
+#        tot = sum([x[2] for x in day])
+        tot = 1
+        ways.append([(x[0],x[1],x[2]/tot) for x in day])
+    return ways
+
+def writer(ways,ftw):
+    for item in ways:
+        ftw.write("\\addplot3[color=black] coordinates {" + " ".join(["(" + ",".join([str(x) for x in y]) + ")" for y in item]) + "};" + "\n")
+
+fates = []
+tates = {}
+fates,tates = sifter(f+'maildir',fates,tates)
+dates = sorted(fates)
+days,wates = setter(dates)
+ways = weighter(days,wates,0.001,10)
+writer(ways,open(f+"DateWeights.txt",'w'))
+

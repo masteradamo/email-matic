@@ -1,0 +1,18 @@
+import gensim
+
+fr = "/path/to/written/content.txt"
+fd = "/home/masteradamo/academy/Goldielocksmiths/mailmatic/data/enron/gendict.dict"
+fm = "/home/masteradamo/academy/Goldielocksmiths/mailmatic/data/enron/ldamod20tops.txt"
+
+text = [x.split() for x in open(fr,'r').readlines()]
+print("CORPUS LOADED,",len(text),"DOCUMENTS")
+dicto = gensim.corpora.Dictionary(text)
+#dicto.save(fd)
+print("DICTIONARY BUILT AND SAVED")
+corp = [dicto.doc2bow(x) for x in text]
+print("WORDS BAGGED")
+mod = gensim.models.ldamodel.LdaModel(corpus=corp,id2word=dicto,num_topics=20, update_every=1,chunksize=5000,passes=1)
+print("MODEL BUILT")
+mod.save(fm)
+print("MODEL SAVED")
+mod.print_topics(20)

@@ -1,0 +1,86 @@
+f = "/path/to/emails/"
+fm = "/path/to/lda/model"
+fr = "/path/to/written/content.txt"
+#fd = "/path/to/w2v/model"
+
+import os
+import email
+import gensim
+import numpy as np
+import re
+from nltk.corpus import stopwords
+
+stops = stopwords.words("english")[:127]
+
+slayers = ['ken.lay@enron.com', 'jeff.dasovich@enron.com', 'tana.jones@enron.com', 'kay.mann@enoron.com', 'steven.kean@enron.com', 'vince.kaminski@enron.com', 'mark.taylor@enron.com', 'sally.beck@enron.com', 'daren.farmer@enron.com', 'john.lavorato@enron.com', 'louise.kitcher@enron.com', 'richard.shapiro@enron.com']
+
+topics = ['chargers', 'baylor', 'chris', 'risks', 'web-based', 'petroleum', 'mountain', 'raster', 'renee', 'vice-president', 'want', 'matt', 'validation', 'halliburton', 'g', 'tuesday', 'reporting', 'firms', 'september', 'days', 'newschannel', 'refund', 'cheryl', 'sarah', 'agr\xe1ria', 'g', 'coach', 'gujarat', 'usd', 'usd', 'javascript', 'colleges', 'biogas', 'gr', 'countries', 'pgp', 'andrew', '046', 'judd', 'downtown', 'thigh', 'e-mail', 'document', 'stupid', 'contract', 'e-mail', 'aclu', 'match-up', 'tungsten', 'okay']
+
+mod = gensim.models.ldamodel.LdaModel.load(fm)
+#wtv = gensim.models.Word2Vec.load(fd)
+
+text = [x.split() for x in open(fr,'r').readlines()]
+print("TRANSLATION CORPUS LOADED,",len(text),"DOCUMENTS")
+dicto = gensim.corpora.Dictionary(text)
+
+def sifter(direct,topdi,seen):
+    for fold in os.listdir(direct):
+        fold = direct+"/"+fold
+        if os.path.isfile(fold):
+            topdi,seen = topper(fold,topdi,seen)
+        elif os.path.isdir(fold):
+            print "FOLDER",fold
+            topdi,seen = sifter(fold,topdi,seen)
+    return topdi,seen
+
+def cleaner(pay,seen):
+#    cont = msg.get_payload().lower()
+#    print "PAY",pay
+    slim = re.sub("[,|;|\"|\'|\(|\)|\[|\]|<|>|*|#|&]","",pay)
+    slim = re.sub("[-\-+|_+|~+]","",slim)
+    slim = re.sub("=[0-9]+","",slim)
+    slim = re.sub("[0-9]","",slim)
+    slim = re.sub("= ","",slim)
+    slim = re.sub("\s"," ",slim)
+    sents = re.split("[!|\?|\.]+",slim)
+    bow = []
+    for sent in sents:
+        if sent not in seen:
+            seen[sent] = True
+            sent = " ".join([x for x in sent.split() if x not in stops])
+            sent = re.sub(" +"," ",sent)
+            sent = sent.split()
+            bow.extend(sent)
+#    print "BOW",bow
+    return bow,seen
+
+def topper(fold,topdi,seen):
+    msg = email.message_from_file(open(fold,'r'))
+    if msg["from"]:
+        froms = msg["from"].split(",")
+        for item in froms:
+            if item in slayers:
+                cont,seen = cleaner(msg.get_payload().lower(),seen)
+                cont = dicto.doc2bow(cont)
+#                print "BOW",cont
+#                print "TOPICS",mod.get_document_topics(cont)
+                tops = sorted([(x[1],x[0]) for x in mod.get_document_topics(cont)],reverse=True)
+                if msg["to"]:
+                    tos = msg["to"].split(",")
+                    for ele in tos:
+                        if ele in slayers:
+                            for sco in tops:
+                                topdi[sco[1]] += sco[0]
+    return topdi,seen
+
+def returner(topdi):
+    scores = sorted([(topdi[x],x) for x in topdi],reverse=True)
+    print [topics[x[1]] for x in scores]
+    norm = np.sum([x[0] for x in scores])
+    for item in scores:
+        print "(" + topics[item[1]] + "," + "%.4f" % (item[0]/norm) + ")"
+
+topdi = {x:0.0 for x in range(len(topics))}
+seen = {}
+topdi,seen = sifter(f+'maildir',topdi,seen)
+returner(topdi)

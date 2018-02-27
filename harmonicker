@@ -1,0 +1,38 @@
+f = "/path/to/emails/"
+
+import os
+import email
+import re
+from collections import defaultdict as dedi
+
+def sifter(direct,froms,tos):
+    for fold in os.listdir(direct):
+        fold = direct+"/"+fold
+        if os.path.isfile(fold):
+            froms,tos = doer(fold)
+        elif os.path.isdir(fold):
+            print "FOLDER",fold
+            froms,tos = sifter(fold,froms,tos)
+    return froms,tos
+
+def doer(fold):
+    msg = email.message_from_file(open(fold,'r'))
+    if msg["from"]:
+        for ele in msg["from"].split(","):
+            froms[ele] += 1
+    if msg["to"]:
+        for ele in msg["to"].split(","):
+            tos[ele] += 1
+    return froms,tos
+
+def counter(froms,tos):
+    acnt = dedi(float)
+    for ele in froms:
+        if ele in tos:
+            acnt[ele] = (2*froms[ele]*tos[ele])/(froms[ele]+tos[ele])
+    print(sorted([(acnt[x],x) for x in acnt],reverse=True)[:50])
+
+froms = dedi(float)
+tos = dedi(float)
+froms,tos = sifter(f+'maildir',froms,tos)
+counter(froms,tos)

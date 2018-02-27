@@ -1,0 +1,29 @@
+import os
+import email
+
+f = "/path/to/emails/"
+
+slayers = ['ken.lay@enron.com', 'jeff.dasovich@enron.com', 'tana.jones@enron.com', 'kay.mann@enoron.com', 'steven.kean@enron.com', 'vince.kaminski@enron.com', 'mark.taylor@enron.com', 'sally.beck@enron.com', 'daren.farmer@enron.com', 'john.lavorato@enron.com', 'louise.kitchen@enron.com', 'richard.shapiro@enron.com']
+
+def sifter(direct):
+    for fold in os.listdir(direct):
+        fold = direct+"/"+fold
+        if os.path.isfile(fold):
+            linker(fold)
+        elif os.path.isdir(fold):
+#            print "FOLDER",fold
+            sifter(fold)
+    return None
+
+def linker(fold):
+    msg = email.message_from_file(open(fold,'r'))
+    if msg["to"]:
+        if "louise.kitchen@enron.com" in msg["to"].split(","):
+#            print "KEN SPOTTED"
+            if msg["from"]:
+                srom = msg["from"].split(",")
+                for thing in srom:
+                    if thing in slayers:
+                        print "HIT",thing
+
+sifter(f+'maildir')

@@ -1,0 +1,46 @@
+f = "/path/to/emails/"
+fw = "/path/to/write/content.txt"
+
+import os
+import email
+from nltk.corpus import stopwords
+import re
+
+def sifter(direct,ftw,seen):
+    for fold in os.listdir(direct):
+        fold = direct+"/"+fold
+        if os.path.isfile(fold):
+            seen = doer(fold)
+        elif os.path.isdir(fold):
+            print "FOLDER",fold
+            seen = sifter(fold,ftw,seen)
+    return seen
+
+def doer(fold):
+    msg = email.message_from_file(open(fold,'r'))
+    cont = msg.get_payload().lower()
+    slim = re.sub("[,|;|\"|\'|\(|\)|\[|\]|<|>|*|#|&]","",cont)
+    slim = re.sub("[-\-+|_+|~+]","",slim)
+    slim = re.sub("=[0-9]+","",slim)
+    slim = re.sub("[0-9]","",slim)
+    slim = re.sub("= ","",slim)
+    slim = re.sub("\s"," ",slim)
+#    slim = re.sub(" for | a | of | the | and | to | in | an | this | that | you | me | your | my | they | them | their | him | her | his | hers | us | we | our "," ",slim)
+    slim = re.sub("-+original|message-+"," ",slim)
+#    slim = re.sub(" +"," ",slim)
+    sents = re.split("[!|\?|\.]+",slim)
+    for sent in sents:
+        if sent not in seen:
+            seen[sent] = True
+            sent = " ".join([x for x in sent.split() if x not in stops])
+            sent = re.sub(" +"," ",sent)
+            ftw.write(sent + " ")
+#    slim = re.sub("[!|\?|\.|]","",slim)
+#    slim = re.sub("\\n"," ",slim)
+    ftw.write("\n")
+    return seen
+
+stops = stopwords.words("english")[:127]
+ftw = open(fw,'w')
+seen = {}
+sifter(f+"maildir",ftw,seen)

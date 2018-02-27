@@ -1,0 +1,28 @@
+import gensim
+
+fm = "/path/to/lda/model"
+fd = "/path/to/w2v/model"
+
+mod = gensim.models.ldamodel.LdaModel.load(fm)
+wtv = gensim.models.Word2Vec.load(fd)
+
+def topicker():
+    topdi = []
+    for top in mod.show_topics(num_topics=20):
+        stop = top[1].split(" + ")
+        tords = [x.split("*")[1][1:-1] for x in stop]
+        words = []
+        for word in tords:
+            try:
+                test = wtv[word]
+                words.append(word)
+            except KeyError:
+                True
+        print "WORDS",words
+        topdi.append(wtv.most_similar(positive=[x for x in words if wtv[x].any()]))
+    return topdi
+
+topdi = topicker()
+print ""
+for top in mod.show_topics:
+    print top

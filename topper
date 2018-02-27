@@ -1,0 +1,197 @@
+f = "/path/to/emails/"
+fm = "/path/to/lda/model"
+fr = "/path/to/written/content.txt"
+fd = "/path/to/w2v/model"
+
+import os
+import email
+import gensim
+import numpy as np
+import re
+from nltk.corpus import stopwords
+
+stops = stopwords.words("english")[:127]
+
+slayers = ['ken.lay@enron.com', 'jeff.dasovich@enron.com', 'tana.jones@enron.com', 'kay.mann@enron.com', 'steven.kean@enron.com', 'vince.kaminski@enron.com', 'mark.taylor@enron.com', 'sally.beck@enron.com', 'sara.shackleton@enron.com', 'john.lavorato@enron.com', 'louise.kitchen@enron.com', 'richard.shapiro@enron.com']
+
+players = ['pete.davis@enron.com', 'jeff.dasovich@enron.com', 'tana.jones@enron.com', 'sara.shackleton@enron.com', 'kay.mann@enron.com', 'steven.kean@enron.com', 'vince.kaminski@enron.com', 'kate.symes@enron.com', 'mark.taylor@enron.com', 'sally.beck@enron.com', 'gerald.nemec@enron.com', 'chris.germany@enron.com', 'daren.farmer@enron.com', 'benjamin.rogers@enron.com', 'john.lavorato@enron.com', 'louise.kitchen@enron.com', 'richard.shapiro@enron.com', 'elizabeth.sager@enron.com', 'susan.scott@enron.com', 'john.arnold@enron.com', 'eric.bass@enron.com', 'james.steffes@enron.com', 'richard.sanders@enron.com', 'mark.haedicke@enron.com', 'mike.mcconnell@enron.com', 'matthew.lenhart@enron.com', 'david.delainey@enron.com', 'carol.clair@enron.com', 'dan.hyvl@enron.com', 'susan.mara@enron.com', 'mike.grigsby@enron.com', 'maureen.mcvicker@enron.com', 'shirley.crenshaw@enron.com', 'rod.hayslett@enron.com', 'jeffrey.shankman@enron.com', 'phillip.allen@enron.com', 'd..steffes@enron.com','rick.buy@enron.com', 'errol.mclaughlin@enron.com', 'kimberly.watson@enron.com', 'alan.comnes@enron.com', 'michelle.cash@enron.com', 'j.kaminski@enron.com', 'scott.neal@enron.com', 'debra.perlingiere@enron.com', 'shelley.corman@enron.com', 'marie.heard@enron.com', 'stanley.horton@enron.com', 'michelle.lokay@enron.com', 'mary.hain@enron.com']
+
+topics = ['chargers', 'baylor', 'chris', 'risks', 'web-based', 'petroleum', 'mountain', 'raster', 'renee', 'vice-president', 'want', 'matt', 'validation', 'halliburton', 'g', 'tuesday', 'reporting', 'firms', 'september', 'days', 'newschannel', 'refund', 'cheryl', 'sarah', 'agr\xe1ria', 'g', 'coach', 'gujarat', 'usd', 'usd', 'javascript', 'colleges', 'biogas', 'gr', 'countries', 'pgp', 'andrew', '046', 'judd', 'downtown', 'thigh', 'e-mail', 'document', 'stupid', 'contract', 'e-mail', 'aclu', 'match-up', 'tungsten', 'okay']
+
+mod = gensim.models.ldamodel.LdaModel.load(fm)
+wtv = gensim.models.Word2Vec.load(fd)
+
+text = [x.split() for x in open(fr,'r').readlines()]
+print("TRANSLATION CORPUS LOADED,",len(text),"DOCUMENTS")
+dicto = gensim.corpora.Dictionary(text)
+print("TRANSLATER BUILT")
+
+def topicker():
+    topdi = []
+    for top in mod.show_topics(num_topics=50):
+        stop = top[1].split(" + ")
+        tords = [x.split("*")[1][1:-1] for x in stop]
+        words = []
+        for word in tords:
+            try:
+                test = wtv[word]
+                words.append(word)
+            except KeyError:
+                True
+        print "WORDS",words
+        topdi.append(wtv.most_similar(positive=[x for x in words if wtv[x].any()]))
+    return topdi
+
+def playdicter():
+    playdi = {}
+    topdi = {}
+    for x in slayers:
+        playdi[x] = {}
+        topdi[x] = {z:{} for z in range(50)}
+        for y in slayers:
+            if y != x:
+                playdi[x][y] = [0.0]*50
+                for z in range(50):
+                    topdi[x][z][y] = 0.0
+    return playdi,topdi
+
+def sifter(direct,playdi,topdi,seen):
+    for fold in os.listdir(direct):
+        fold = direct+"/"+fold
+        if os.path.isfile(fold):
+            playdi,topdi,seen = linker(fold,playdi,topdi,seen)
+        elif os.path.isdir(fold):
+#            print "FOLDER",fold
+            playdi,topdi,seen = sifter(fold,playdi,topdi,seen)
+    return playdi,topdi,seen
+
+def cleaner(pay,seen):
+#    cont = msg.get_payload().lower()
+#    print "PAY",pay
+    slim = re.sub("[,|;|\"|\'|\(|\)|\[|\]|<|>|*|#|&]","",pay)
+    slim = re.sub("[-\-+|_+|~+]","",slim)
+    slim = re.sub("=[0-9]+","",slim)
+    slim = re.sub("[0-9]","",slim)
+    slim = re.sub("= ","",slim)
+    slim = re.sub("\s"," ",slim)
+    sents = re.split("[!|\?|\.]+",slim)
+    bow = []
+    for sent in sents:
+        if sent not in seen:
+            seen[sent] = True
+            sent = " ".join([x for x in sent.split() if x not in stops])
+            sent = re.sub(" +"," ",sent)
+            sent = sent.split()
+            bow.extend(sent)
+#    print "BOW",bow
+    return bow,seen
+
+def linker(fold,playdi,topdi,seen):
+    msg = email.message_from_file(open(fold,'r'))
+    if msg["from"]:
+        froms = msg["from"].split(",")
+        for item in froms:
+#            if item in playdi:
+            if item in slayers:
+                cont,seen = cleaner(msg.get_payload().lower(),seen)
+                cont = dicto.doc2bow(cont)
+#                print "BOW",cont
+#                print "TOPICS",mod.get_document_topics(cont)
+                tops = sorted([(x[1],x[0]) for x in mod.get_document_topics(cont)],reverse=True)
+                if msg["to"]:
+                    tos = msg["to"].split(",")
+                    for ele in tos:
+                        if ele != item:
+                            if ele in slayers:
+                                for sco in tops[:10]:
+                                    playdi[item][ele][sco[1]] += sco[0]
+                                    topdi[item][sco[1]][ele] += sco[0]
+    return playdi,topdi,seen
+
+def playsolver(playdi):
+    normdi = {}
+    for item in playdi:
+        normdi[item] = {}
+        for ele in playdi[item]:
+            norm = sum(playdi[item][ele])
+            if norm > 0:
+                normdi[item][ele] = [x/norm for x in playdi[item][ele]]
+            else:
+                normdi[item][ele] = [0.0 for x in playdi[item][ele]]
+    return normdi
+
+def topsolver(topdi):
+    normdi = {}
+    for item in topdi:
+        normdi[item] = {x:{} for x in range(50)}
+        for num in topdi[item]:
+            norm = sum([topdi[item][num][x] for x in topdi[item][num]])
+            if norm > 0:
+                for ele in topdi[item][num]:
+                    normdi[item][num][ele] = topdi[item][num][ele]/norm
+            else:
+                for ele in topdi[item][num]:
+                    normdi[item][num][ele] = 0.0
+    return normdi
+
+def combiner(pd,td):
+    combplay,combtop = playdicter()
+    for item1 in slayers:
+        for item2 in slayers:
+            if item1 != item2:
+                for x in range(50):
+#                    combplay[item1][item2][x] = np.cbrt((pd[item1][item2][x]+pd[item2][item1][x])/2)
+#                    combtop[item1][x][item2] = np.sqrt((td[item1][x][item2]+td[item2][x][item1])/2)
+                    combplay[item1][item2][x] = np.sqrt((pd[item1][item2][x]+pd[item2][item1][x])/2)
+                    combtop[item1][x][item2] = (td[item1][x][item2]+td[item2][x][item1])/2
+    return combplay,combtop
+
+def selecter(tox,playnorm,topnorm):
+    num = topics.index(tox)
+    print "TOPIC",tox,num
+    plays,tops = [],[]
+    for item in playnorm:
+        for ele in playnorm[item]:
+            plays.append((playnorm[item][ele][num],sorted([item,ele])))
+            tops.append((topnorm[item][num][ele],sorted([item,ele])))
+[::2]
+    pscores = [x for x in sorted(plays,reverse=True) if x[0] > 0][::2]
+    tscores = [x for x in sorted(tops,reverse=True) if x[0] > 0][::2]
+    outputter(pscores,tscores,"blue")
+
+def totaller(playnorm,topnorm):
+    plays,tops = [],[]
+    for item in slayers:
+        for ele in slayers:
+            if item != ele:
+                plays.append((sum(playnorm[item][ele])/100,sorted([item,ele])))
+                tops.append((sum([topnorm[item][x][ele] for x in topnorm[item]])/100,sorted([item,ele])))
+    pscores = [x for x in sorted(plays,reverse=True) if x[0] > 0][::2]
+    tscores = [x for x in sorted(tops,reverse=True) if x[0] > 0][::2]
+    outputter(pscores,tscores,"blue")
+
+def outputter(pscores,tscores,col):
+    sdi = {}
+    for ps in pscores:
+        n1 = "n"+ps[1][0].split("@")[0].split(".")[1]
+        n2 = "n"+ps[1][1].split("@")[0].split(".")[1]
+        sdi[n1,n2] = [ps[0]]
+    for ts in tscores:
+        n1 = "n"+ts[1][0].split("@")[0].split(".")[1]
+        n2 = "n"+ts[1][1].split("@")[0].split(".")[1]
+        sdi[n1,n2].append(ts[0])
+    for item in sdi:
+        print "\\draw [latex-latex,line width=" + "%.3f" % sdi[item][0] + "cm,color=" + col + "!" + str(max(10,int((sdi[item][1]*100)))) + "] (" + item[0] + ")--(" + item[1] + ");"
+
+playdi,topdi = playdicter()
+print "DICTIONARIES BUILT"
+seen = {}
+playdi,topdi,seen = sifter(f+'maildir',playdi,topdi,seen)
+print "MAILS ANALYSED"
+playnorm = playsolver(playdi)
+print "PLAYERS NORMALISED"
+topnorm = topsolver(topdi)
+print "TOPICS NORMALISED"
+combplay,combtop = combiner(playnorm,topnorm)
+selecter("okay",combplay,combtop)
+

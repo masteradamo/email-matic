@@ -1,0 +1,51 @@
+import numpy as np
+
+f = "/path/to/emails/"
+
+def dicter(fn):
+    ftr = open(fn,'r').readlines()
+    return {x.split("::")[0][:-1]:x.split("::")[1] for x in ftr}
+
+def opener(fn,top):
+    ftr = open(fn,'r').readlines()
+    dout = {}
+    for line in ftr:
+#        print line
+        line = line.split("::")
+        fist = [float(x.split(",")[1]) for x in line[1].split(";") if x.split(",")[0] in top]
+        if len(fist) > 0:
+            freq = sum(fist)
+            dout[line[0]] = {x.split(",")[0]:float(x.split(",")[1])/freq for x in line[1].split(";") if x.split(",")[0] in top}
+    print("VECS FOR",len(dout),"OUT OF",len(ftr))
+    return dout
+
+def comper(fro,tom,fw,full):
+    ftw = open(fw,'w')
+    cnt = 0
+    for fitem in fro:
+        print cnt,fitem
+        cnt += 1
+        ftw.write(fitem + "::")
+        dists = []
+        for titem in tom:
+            hell = 0.0
+            for fot in fro[fitem]:
+                if fot in tom[titem]:
+                    hell += (np.sqrt(fro[fitem][fot])-np.sqrt(tom[titem][fot]))**2
+                else:
+                    hell += fro[fitem][fot]
+            for tot in tom[titem]:
+                if tot not in fro[fitem]:
+                    hell += tom[titem][tot]
+            dists.append(full[titem] + "," + "%.6f" % ((1/np.sqrt(2))*np.sqrt(hell)))
+        ftw.write(";".join(dists) + "\n")
+
+full = {x.split("::")[0]:x.split("::")[1][:-1] for x in open(f+"TopTos.txt",'r').readlines()}
+print("FULL DICT BUILT")
+top = {x.split("::")[0]:True for x in open(f+"TopTos.txt",'r').readlines()[:1000]}
+print("TOP DICT BUILT")
+fro = opener(f+"FromProbs.txt",top)
+print("FROM DICT BUILT")
+tom = opener(f+"ToProbs.txt",top)
+print("TO DICT BUILT")
+comper(fro,tom,f+"Top1000inger.txt",full)

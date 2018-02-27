@@ -1,0 +1,17 @@
+f = "/path/to/emails/"
+
+ftr = open(f+"FromProbs.txt",'r').readlines()
+ftw = open(f+"TopTos.txt",'w')
+tdict = {}
+for line in ftr:
+    line = line.split("::")
+    print line
+    for item in line[1].split(";"):
+        point = item.split(",")
+        if point[0] in tdict:
+            tdict[point[0]] += 1
+        else:
+            tdict[point[0]] = 1
+
+scores = [x[1] for x in sorted([(tdict[x],x) for x in tdict],reverse=True)]
+ftw.write("\n".join([scores[x] + "::" + str(x) for x in range(len(scores))]))

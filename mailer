@@ -1,0 +1,74 @@
+f = "/path/to/emails/"
+
+import os
+import re
+
+def sifter(direct,ftot,ttot,fdict,tdict):
+    for fold in os.listdir(direct):
+        fold = direct+"/"+fold
+        if os.path.isfile(fold):
+            ftot,ttot,fdict,tdict = opener(fold,ftot,ttot,fdict,tdict)
+        elif os.path.isdir(fold):
+            print "FOLDER",fold
+            ftot,ttot,fdict,tdict = sifter(fold,ftot,ttot,fdict,tdict)
+    return ftot,ttot,fdict,tdict
+
+def dicter(di,item):
+    if item in di:
+        di[item] += 1.0
+    else:
+        di[item] = 1.0
+    return di
+
+def opener(fold,ftot,ttot,fdict,tdict):
+    mail = open(fold,'r').readlines()
+    for line in mail:
+        if re.match("From:",line):
+            fro = line.split(": ")[1].split(",")
+        elif re.match("To:",line):
+            tom = line.split(": ")[1].split(",")
+        elif re.match("\W",line):
+            break
+    if "fro" not in locals():
+        for line in mail:
+            if re.match("X-From:",line):
+                fro = line.split(": ")[1].split(",")
+    if "tom" not in locals():
+        for line in mail:
+            if re.match("X-To:",line):
+                tom = line.split(": ")[1].split(",")
+    try:
+        fro = [re.findall("[\w,.,-]+@[\w,.,-]+",x)[0] for x in fro]
+    except IndexError:
+        print "FROM ERROR",fro
+    ntom = []
+    for bit in tom:
+        try:
+            ntom.append(re.findall("[\w,.,-]+@[\w,.,-]+",bit)[0])
+        except IndexError:
+            pass
+    tom = ntom
+    fro = [re.sub("\s+","",x) for x in fro]
+    tom = [re.sub("\s+","",x) for x in tom]
+    if len(fro) > 0 and len(tom) > 0:
+        for fitem in fro:
+            if fitem not in fdict:
+                fdict[fitem] = {}
+            for titem in tom:
+                ftot = dicter(ftot,fitem)
+                ttot = dicter(ttot,titem)
+                fdict[fitem] = dicter(fdict[fitem],titem)
+                if titem not in tdict:
+                    tdict[titem] = {}
+                tdict[titem] = dicter(tdict[titem],fitem)
+    return ftot,ttot,fdict,tdict
+
+def writer(fname,di,dt):
+    ftw = open(fname,'w')
+    for item in di:
+        ftw.write(item + "::" + ";".join([x + "," + "%.6f" % (di[item][x]/dt[item]) for x in di[item]]) + "\n")
+
+ftot,ttot,fdict,tdict = {},{},{},{}
+ftot,ttot,fdict,tdict = sifter(f+"maildir",ftot,ttot,fdict,tdict)
+writer(f+"FromProbs.txt",fdict,ftot)
+writer(f+"ToProbs.txt",tdict,ttot)

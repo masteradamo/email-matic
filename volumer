@@ -1,0 +1,73 @@
+f = "/path/to/emails/"
+
+import os
+import email
+import numpy as np
+
+months = [[0,31,29,31,30,31,30,31,31,30,31,30],[0,31,29,31,30,31,30,31,31,30,31,30]]
+
+def sifter(direct,vol,check,mult):
+    for fold in os.listdir(direct):
+        fold = direct+"/"+fold
+        if os.path.isfile(fold):
+            vol,rec = opener(fold,vol,check,mult)
+        elif os.path.isdir(fold):
+            print "FOLDER",fold
+            vol,rec = sifter(fold,vol,check,mult)
+    return vol,check
+
+def ruler(date):
+    return (date*365) + (date/4)
+
+def opener(fold,vol,check,mult):
+    msg = email.message_from_file(open(fold,'r'))
+    date = email.utils.parsedate(msg["date"])
+    if date[0] > 1998 and date[0] < 2003:
+        spate = (ruler(date[0])*1440) + sum([months[min(1,date[0]%4)][x]*1440 for x in range(date[1])]) + date[2]*1440 + date[3]*60 + date[4]
+        date = (ruler(date[0])*mult) + sum([months[min(1,date[0]%4)][x]*mult for x in range(date[1])]) + date[2]*mult #+ date[3]
+        if spate not in check:
+#            print "FROM",msg["from"]
+#            print "TO",msg["to"]
+            if msg["to"] != None:
+                tlen = len(msg["to"].split(","))
+                if date not in vol:
+                    vol[date] = []
+                vol[date].append(tlen)
+                check[spate] = True
+    return vol,check
+
+def setter(vol,div):
+    weeks = {}
+    for item in vol:
+        week = item/div
+        hour = (item+3)%div
+        if week not in weeks:
+            weeks[week] = []
+        weeks[week].append((week,hour,np.mean(vol[item])))
+    wreeks = []
+    for thing in weeks:
+        if len(weeks[thing])<7:
+            hits = [x[1] for x in weeks[thing]]
+            for n in range(7):
+                if n not in hits:
+                    weeks[thing].append((weeks[thing][0][0],n,0.0))
+        wreeks.append(sorted(weeks[thing]))
+    return sorted(wreeks)
+
+def weighter(weeks,sig):
+    reweights = []
+    for item in weeks:
+        reweights.append([(item[x][0],item[x][1],sum([y[x][2]*((1-sig)**abs(y[x][0]-item[x][0])) for y in weeks])) for x in range(len(item))])
+    return reweights
+
+def writer(weeks,ftw):
+    for item in weeks:
+        ftw.write("\\addplot3[left color=blue,right color=red,opacity=0.3] coordinates {(" + str(item[0][0]) + ",0,0) " + " ".join(["(" + ",".join([str(x) for x in y]) + ")" for y in item]) + " (" + str(item[0][0]) + ",6,0)};" + "\n")
+
+vol = {}
+check = {}
+vol,check = sifter(f+'maildir',vol,check,1)
+weeks = setter(vol,7)
+weeks = weighter(weeks,0.02)
+writer(weeks,open(f+"SmoothWeekVolume.txt",'w'))
+
